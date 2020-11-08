@@ -1,0 +1,103 @@
+---
+title: "Practical ML"
+author: "Kartikeya Mehrotra"
+date: "07/11/2020"
+output: html_document
+---
+
+# Setting Up Data and loading libraries
+
+We save the links into variables and load all the libraries necessary.
+```{r load}
+  library(caret)
+  library(randomForest)
+  library(dplyr)
+  library(ggplot2)
+  library(knitr)
+  library(rpart)
+  library(e1071)
+  set.seed(12345)
+  
+  trlink <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+  tslink <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+Loading data into Rstudio memory
+```{r db}
+training <- read.csv(url(trlink), na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url(tslink), na.strings=c("NA","#DIV/0!",""))
+```
+
+Further Splitting the dataset
+```{r split}
+train1 <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+train <- training[train1, ]; 
+test <- training[-train1, ]
+dim(train); dim(test)
+```
+
+# Cleaning and Pre processing
+We remove the unnecessary variables.
+```{r clean}
+dtNZV <- nearZeroVar(train, saveMetrics=TRUE)
+dtNZVvars <- names(train) %in% c("new_window", "kurtosis_roll_belt", "kurtosis_picth_belt",
+"kurtosis_yaw_belt", "skewness_roll_belt", "skewness_roll_belt.1", "skewness_yaw_belt",
+"max_yaw_belt", "min_yaw_belt", "amplitude_yaw_belt", "avg_roll_arm", "stddev_roll_arm",
+"var_roll_arm", "avg_pitch_arm", "stddev_pitch_arm", "var_pitch_arm", "avg_yaw_arm",
+"stddev_yaw_arm", "var_yaw_arm", "kurtosis_roll_arm", "kurtosis_picth_arm",
+"kurtosis_yaw_arm", "skewness_roll_arm", "skewness_pitch_arm", "skewness_yaw_arm",
+"max_roll_arm", "min_roll_arm", "min_pitch_arm", "amplitude_roll_arm", "amplitude_pitch_arm",
+"kurtosis_roll_dumbbell", "kurtosis_picth_dumbbell", "kurtosis_yaw_dumbbell", "skewness_roll_dumbbell",
+"skewness_pitch_dumbbell", "skewness_yaw_dumbbell", "max_yaw_dumbbell", "min_yaw_dumbbell",
+"amplitude_yaw_dumbbell", "kurtosis_roll_forearm", "kurtosis_picth_forearm", "kurtosis_yaw_forearm",
+"skewness_roll_forearm", "skewness_pitch_forearm", "skewness_yaw_forearm", "max_roll_forearm",
+"max_yaw_forearm", "min_roll_forearm", "min_yaw_forearm", "amplitude_roll_forearm",
+"amplitude_yaw_forearm", "avg_roll_forearm", "stddev_roll_forearm", "var_roll_forearm",
+"avg_pitch_forearm", "stddev_pitch_forearm", "var_pitch_forearm", "avg_yaw_forearm",
+"stddev_yaw_forearm", "var_yaw_forearm")
+train <- train[!dtNZVvars]
+#To check the new N?? of observations
+dim(train)
+
+#Removing the ID variable which doesn't matter for prediction as well.
+train <- train[c(-1)]
+
+#Cleaning variables with many NAs
+
+#We first check if there are more than 60% NAs in a column and remove it if yes.
+#Then we remove columns that are redundant, ie, if the row values in column i match the row values of column j
+trainfinal <- train
+for(i in 1:length(train)) { 
+        if( sum( is.na( train[, i] ) ) /nrow(train) >= .6 ) {
+        for(j in 1:length(trainfinal)) {
+            if( length( grep(names(train[i]), names(trainfinal)[j]) ) ==1)  {
+                trainfinal <- trainfinal[ , -j] 
+            }   
+        } 
+    }
+}
+#new dimension of observations
+dim(trainfinal)
+
+#Running the same procedure for the test and testing data
+clean1 <- colnames(trainfinal)
+clean2 <- colnames(trainfinal[, -58]) #Also dropping classe, which has to be predicted
+test <- test[clean1]
+testing <- testing[clean2]
+
+#new dimension of observations
+dim(test)
+dim(testing)
+```
+
+# Using decision trees for prediction
+
+```{r des trees}
+model1 <- rpart(classe ~ ., data=trainfinal, method="class")
+
+pred1 <- predict(model1, test, type = "class")
+confusionMatrix(table(pred1, test$classe))
+```
+
+# Conclusion
+Our model had a high accuracy rating, for all classes, >85%, with the highest accuracy on class A, 97%.
